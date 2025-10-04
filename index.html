@@ -1,0 +1,160 @@
+<?php
+// index.php
+require_once 'db.php';
+
+// Simpan data saat form disubmit
+$success = '';
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = trim($_POST['title'] ?? '');
+    $category = trim($_POST['category'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $author = trim($_POST['author'] ?? '');
+
+    if ($title === '') {
+        $error = 'Judul harus diisi.';
+    } else {
+        $sql = "INSERT INTO media (title, category, description, author) VALUES (:title, :category, :description, :author)";
+        $stmt = $pdo->prepare($sql);
+        try {
+            $stmt->execute([
+                ':title' => $title,
+                ':category' => $category ?: null,
+                ':description' => $description ?: null,
+                ':author' => $author ?: null,
+            ]);
+            $success = 'Data berhasil disimpan.';
+        } catch (Exception $e) {
+            $error = 'Gagal menyimpan: ' . $e->getMessage();
+        }
+    }
+}
+
+// Ambil daftar media
+$items = $pdo->query("SELECT sid, title, category, author, created_at FROM media ORDER BY created_at DESC")->fetchAll();
+?>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Media Pembelajaran Informatika</title>
+
+  <!-- Bootstrap CSS (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Tailwind (CDN - untuk utilitas cepat) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* sedikit custom mix Bootstrap + Tailwind */
+    .hero {
+      background: linear-gradient(135deg,#0ea5a4, #6366f1);
+      color: white;
+    }
+    /* Card tile grid spacing */
+    .tile-grid { gap: 1rem; display: grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+  <!-- Header hero (Bootstrap container + Tailwind utilities) -->
+  <header class="hero py-5 mb-4">
+    <div class="container d-flex flex-column flex-md-row align-items-center justify-content-between">
+      <div>
+        <h1 class="display-6 fw-bold">Media Pembelajaran Informatika</h1>
+        <p class="lead mb-0">Sumber belajar interaktif dan dokumentasi modul pembelajaran untuk SMP/SMA.</p>
+      </div>
+      <div class="mt-3 mt-md-0">
+        <a href="#form" class="btn btn-light btn-lg">Tambah Media</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mb-5">
+    <div class="row">
+      <!-- Form tambah media -->
+      <div class="col-lg-5 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Tambah Media Baru</h5>
+
+            <?php if($success): ?>
+              <div class="alert alert-success"><?=htmlspecialchars($success)?></div>
+            <?php endif; ?>
+            <?php if($error): ?>
+              <div class="alert alert-danger"><?=htmlspecialchars($error)?></div>
+            <?php endif; ?>
+
+            <form id="form" method="post" novalidate>
+              <div class="mb-3">
+                <label class="form-label">Judul</label>
+                <input name="title" class="form-control" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Kategori</label>
+                <input name="category" class="form-control" placeholder="Contoh: Modul, Video, Latihan">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Deskripsi</label>
+                <textarea name="description" class="form-control" rows="4"></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Pengarang / Pembuat</label>
+                <input name="author" class="form-control">
+              </div>
+              <div class="d-grid">
+                <button class="btn btn-primary">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- small help card using Tailwind -->
+        <div class="mt-3 p-3 rounded-lg shadow-sm bg-white">
+          <h6 class="mb-1 text-slate-800">Catatan teknis</h6>
+          <p class="text-sm text-slate-600 mb-0">
+            Data tersimpan di tabel <code>media</code> dengan kolom <code>sid</code> (primary key auto increment).
+          </p>
+        </div>
+      </div>
+
+      <!-- Tile list (grid) -->
+      <div class="col-lg-7">
+        <h5 class="mb-3">Daftar Media</h5>
+
+        <div class="tile-grid">
+          <?php if(empty($items)): ?>
+            <div class="p-4 bg-white rounded shadow-sm">Belum ada media. Tambahkan lewat form di kiri.</div>
+          <?php endif; ?>
+
+          <?php foreach($items as $row): ?>
+            <div class="bg-white rounded-lg shadow-sm p-3">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0"><?=htmlspecialchars($row['title'])?></h6>
+                <small class="text-muted">#<?= $row['sid'] ?></small>
+              </div>
+              <p class="text-sm text-muted mb-2"><?=htmlspecialchars($row['category'] ?: 'Umum')?></p>
+              <div class="text-xs text-muted mb-2">oleh <?=htmlspecialchars($row['author'] ?: '—')?> · <?=htmlspecialchars($row['created_at'])?></div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-primary btn-sm" href="view.php?sid=<?= $row['sid'] ?>">Lihat</a>
+                <a class="btn btn-outline-secondary btn-sm" href="edit.php?sid=<?= $row['sid'] ?>">Edit</a>
+              </div>
+            </div>
+          <?php endforeach; ?>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-4 bg-white border-top">
+    <div class="container text-center">
+      <small class="text-muted">© <?=date('Y')?> Media Pembelajaran Informatika</small>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS (Popper + JS) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
